@@ -5,7 +5,7 @@ const multer = require('multer');
 const XLSX = require('xlsx');
 const path = require('path');
 const fs = require('fs');
-const { protect, admin } = require('../middleware/authMiddleware');
+const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware');
 const AnalysisData = require('../models/AnalysisData');
 const Dependency = require('../models/Dependency');
 
@@ -167,7 +167,7 @@ const procesarDatosExcel = (datosExcel) => {
 // @desc    Subir y procesar archivo Excel
 // @route   POST /api/upload
 // @access  Private/Admin
-router.post('/', protect, admin, upload.single('archivo'), async (req, res) => {
+router.post('/', authenticateToken, requireAdmin, upload.single('archivo'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No se subió ningún archivo' });
@@ -256,7 +256,7 @@ router.post('/', protect, admin, upload.single('archivo'), async (req, res) => {
 // @desc    Obtener estado del último procesamiento
 // @route   GET /api/upload/status
 // @access  Private/Admin
-router.get('/status', protect, admin, async (req, res) => {
+router.get('/status', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const ultimoAnalisis = await AnalysisData.findOne({ activo: true })
       .sort({ createdAt: -1 })

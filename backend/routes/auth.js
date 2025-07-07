@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
-const User = require('../models/user');
-const { protect, admin } = require('../middleware/authMiddleware');
+const User = require('../models/User'); // Usar minúscula para coincidir con el nombre de archivo real
+const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware'); // Cambiado de 'protect, admin' a 'authenticateToken, requireAdmin'
 
 // @desc    Autenticar usuario y obtener token (Login)
 // @route   POST /api/auth/login
@@ -18,9 +18,9 @@ router.post('/login', async (req, res) => {
 
     const user = await User.findOne({ username });
 
-    if (user && (await user.matchPassword(password))) {
+    if (user && (await user.comparePassword(password))) { // Cambiado de 'matchPassword' a 'comparePassword'
       const token = jwt.sign(
-        { id: user._id, role: user.role },
+        { userId: user._id, role: user.role }, // Cambiado de 'id' a 'userId' para consistencia
         process.env.JWT_SECRET,
         { expiresIn: '8h' }
       );
@@ -44,7 +44,7 @@ router.post('/login', async (req, res) => {
 // @desc    Crear un nuevo usuario (solo para admins)
 // @route   POST /api/auth/users
 // @access  Private/Admin
-router.post('/users', protect, admin, async (req, res) => {
+router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
   const { username, password, role } = req.body;
 
   try {
@@ -96,7 +96,7 @@ router.post('/users', protect, admin, async (req, res) => {
 // @desc    Obtener información del usuario actual
 // @route   GET /api/auth/me
 // @access  Private
-router.get('/me', protect, async (req, res) => {
+router.get('/me', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select('-password');
     res.json(user);
@@ -109,7 +109,7 @@ router.get('/me', protect, async (req, res) => {
 // @desc    Obtener lista de todos los usuarios (solo admins)
 // @route   GET /api/auth/users
 // @access  Private/Admin
-router.get('/users', protect, admin, async (req, res) => {
+router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const users = await User.find({}).select('-password').sort({ createdAt: -1 });
     res.json(users);
@@ -122,7 +122,7 @@ router.get('/users', protect, admin, async (req, res) => {
 // @desc    Actualizar usuario (solo admins)
 // @route   PUT /api/auth/users/:id
 // @access  Private/Admin
-router.put('/users/:id', protect, admin, async (req, res) => {
+router.put('/users/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { username, role } = req.body;
     const user = await User.findById(req.params.id);
@@ -140,7 +140,7 @@ router.put('/users/:id', protect, admin, async (req, res) => {
     res.json({
       _id: user._id,
       username: user.username,
-      role: user.role,
+      role: userser.role,
       message: 'Usuario actualizado exitosamente',
     });
 
@@ -153,7 +153,7 @@ router.put('/users/:id', protect, admin, async (req, res) => {
 // @desc    Eliminar usuario (solo admins)
 // @route   DELETE /api/auth/users/:id
 // @access  Private/Admin
-router.delete('/users/:id', protect, admin, async (req, res) => {
+router.delete('/Users/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
 
@@ -179,7 +179,7 @@ router.delete('/users/:id', protect, admin, async (req, res) => {
 // @desc    Cambiar contraseña
 // @route   PUT /api/auth/change-password
 // @access  Private
-router.put('/change-password', protect, async (req, res) => {
+router.put('/change-password', authenticateToken, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
@@ -193,7 +193,7 @@ router.put('/change-password', protect, async (req, res) => {
 
     const user = await User.findById(req.user._id);
 
-    if (!(await user.matchPassword(currentPassword))) {
+    if (!(await user.comparePassword(currentPassword))) { // Cambiado de 'matchPassword' a 'comparePassword'
       return res.status(400).json({ message: 'Contraseña actual incorrecta' });
     }
 
@@ -215,13 +215,14 @@ const createAdminUser = async () => {
     if (!adminExists) {
       const admin = new User({
         username: 'admin',
-        password: 'admin123', // Cambia esto por una contraseña segura
+        email: 'admin@example.com', // Cambia esto por un email válido
+        password: 'admin1234', // Cambia esto por una contraseña segura
         role: 'admin'
       });
       await admin.save();
       console.log('Usuario administrador creado.');
       console.log('Username: admin');
-      console.log('Password: admin123');
+      console.log('Password: admin1234');
       console.log('¡IMPORTANTE: Cambia esta contraseña después del primer login!');
     }
   } catch (error) {

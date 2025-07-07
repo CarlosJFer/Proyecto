@@ -6,7 +6,7 @@ require('dotenv').config();
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
-const uploadRoutes = require('./routes/upload');
+const uploadRoutes = require('./routes/uploadRoutes');
 const analyticsRoutes = require('./routes/analytics');
 
 const app = express();

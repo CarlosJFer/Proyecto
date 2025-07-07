@@ -4,14 +4,14 @@
 
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/authMiddleware');
+const { authenticateToken } = require('../middleware/authMiddleware');
 const AnalysisData = require('../models/AnalysisData');
 const Dependency = require('../models/Dependency');
 
 // @desc    Obtener lista de secretarías disponibles
 // @route   GET /api/analytics/secretarias
 // @access  Private
-router.get('/secretarias', protect, async (req, res) => {
+router.get('/secretarias', authenticateToken, async (req, res) => {
   try {
     // Obtener todas las secretarías que tienen datos analizados
     const secretarias = await AnalysisData.find({ activo: true })
@@ -37,7 +37,7 @@ router.get('/secretarias', protect, async (req, res) => {
 // @desc    Obtener datos de análisis de una secretaría específica
 // @route   GET /api/analytics/secretarias/:id
 // @access  Private
-router.get('/secretarias/:id', protect, async (req, res) => {
+router.get('/secretarias/:id', authenticateToken, async (req, res) => {
   try {
     const secretariaId = req.params.id;
     
@@ -90,7 +90,7 @@ router.get('/secretarias/:id', protect, async (req, res) => {
 // @desc    Obtener resumen general de todas las secretarías
 // @route   GET /api/analytics/resumen
 // @access  Private
-router.get('/resumen', protect, async (req, res) => {
+router.get('/resumen', authenticateToken, async (req, res) => {
   try {
     // Obtener todos los análisis activos
     const analisis = await AnalysisData.find({ activo: true })
@@ -124,7 +124,7 @@ router.get('/resumen', protect, async (req, res) => {
 // @desc    Comparar dos secretarías
 // @route   GET /api/analytics/comparar/:id1/:id2
 // @access  Private
-router.get('/comparar/:id1/:id2', protect, async (req, res) => {
+router.get('/comparar/:id1/:id2', authenticateToken, async (req, res) => {
   try {
     const { id1, id2 } = req.params;
     
@@ -169,7 +169,7 @@ router.get('/comparar/:id1/:id2', protect, async (req, res) => {
 // @desc    Obtener estadísticas por campo específico
 // @route   GET /api/analytics/estadisticas/:campo
 // @access  Private
-router.get('/estadisticas/:campo', protect, async (req, res) => {
+router.get('/estadisticas/:campo', authenticateToken, async (req, res) => {
   try {
     const campo = req.params.campo;
     const camposPermitidos = ['contratacion', 'funcion', 'escalafon', 'edad', 'antiguedad', 'genero'];
