@@ -1,8 +1,12 @@
 // ARCHIVO: src/pages/DashboardPage.js (Modificado)
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import apiClient from '../services/api'; // 1. Importar nuestro cliente API
+import apiClient from '../services/api';
+import CustomBarChart from '../components/BarChart.jsx';
+import CustomPieChart from '../components/PieChart.jsx';
+import { Box, Typography, Card, CardContent, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
 
 const DashboardPage = () => {
   const { secretariaId } = useParams();
@@ -36,42 +40,99 @@ const DashboardPage = () => {
     fetchData();
   }, [secretariaId]); // Se ejecuta cada vez que cambia el secretariaId en la URL
 
-  if (loading) return <p>Cargando datos del dashboard...</p>;
-  if (error) return <p style={{ color: 'red' }}>{error}</p>;
-
-  [cite_start]// 4. Actualizamos el JSX para que coincida con la estructura de datos real de la API [cite: 149, 150]
+  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh"><CircularProgress /></Box>;
+  if (error) return <Alert severity="error">{error}</Alert>;
   return (
-    <div>
+    <Box maxWidth={1200} mx="auto" p={3}>
       {/* Si es la página por defecto, mostramos un mensaje de bienvenida */}
       {!data && secretariaId === 'default' && (
-        <h1>Bienvenido, por favor selecciona una secretaría para ver el análisis.</h1>
+        <Typography variant="h4" align="center" color="text.secondary">Bienvenido, por favor selecciona una secretaría para ver el análisis.</Typography>
       )}
 
       {/* Si hay datos, mostramos el dashboard */}
       {data && (
         <>
-          <h1>Análisis para: {data.secretaria.nombre}</h1>
-          <div style={{ background: '#f4f4f4', padding: '20px', borderRadius: '8px' }}>
-            <h2>Resumen General</h2>
-            <p><strong>Total de Agentes:</strong> {data.resumen.totalAgentes}</p>
-            <p><strong>Masa Salarial:</strong> ${data.resumen.masaSalarial.toLocaleString('es-AR')}</p>
-            <p><strong>Sueldo Promedio:</strong> ${data.resumen.sueldoPromedio.toLocaleString('es-AR')}</p>
-            <p style={{ fontSize: '0.8em', color: '#666' }}>Última actualización: {new Date(data.secretaria.ultimaActualizacion).toLocaleDateString()}</p>
-          </div>
-          <div style={{ marginTop: '20px' }}>
-            {/* Aquí irían los demás componentes de visualización y gráficos */}
-            <h2>Distribución por Contratación</h2>
-            {/* Ejemplo de cómo mostrar más datos */}
-            <ul>
-              {data.analisis.contratacion.map(c => (
-                <li key={c.tipo}>{c.tipo}: {c.cantidad} agentes ({c.porcentaje}%)</li>
-              ))}
-            </ul>
-          </div>
+          <Typography variant="h4" gutterBottom> Análisis para: {data.secretaria.nombre} </Typography>
+          <Card className="mb-6 mt-4 bg-gray-50">
+            <CardContent>
+              <Typography variant="h6" gutterBottom>Resumen General</Typography>
+              <Box display="flex" gap={6} flexWrap="wrap">
+                <Box>
+                  <Typography><strong>Total de Agentes:</strong> {data.resumen.totalAgentes}</Typography>
+                  <Typography><strong>Masa Salarial:</strong> ${data.resumen.masaSalarial.toLocaleString('es-AR')}</Typography>
+                  <Typography><strong>Sueldo Promedio:</strong> ${data.resumen.sueldoPromedio.toLocaleString('es-AR')}</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    Última actualización: {new Date(data.secretaria.ultimaActualizacion).toLocaleDateString()}
+                  </Typography>
+                </Box>
+              </Box>
+            </CardContent>
+          </Card>
+
+          {/* Gráficos principales */}
+          <Box display="flex" gap={6} flexWrap="wrap" justifyContent="space-between">
+            {/* Gráfico de barras: Distribución por tipo de contratación */}
+            <Box flex={1} minWidth={350}>
+              <CustomBarChart
+                data={data.analisis.contratacion}
+                xKey="tipo"
+                barKey="cantidad"
+                title="Distribución por Contratación"
+              />
+            </Box>
+            {/* Gráfico de torta: Distribución por género (si existe) */}
+            {data.analisis.genero && Array.isArray(data.analisis.genero) && data.analisis.genero.length > 0 && (
+              <Box flex={1} minWidth={350}>
+                <CustomPieChart
+                  data={data.analisis.genero}
+                  dataKey="cantidad"
+                  nameKey="genero"
+                  title="Distribución por Género"
+                />
+              </Box>
+            )}
+          </Box>
+
+          {/* Otros gráficos: Antigüedad, agrupaciones, etc. */}
+          {data.analisis.antiguedad && Array.isArray(data.analisis.antiguedad) && data.analisis.antiguedad.length > 0 && (
+            <Box mt={4}>
+              <CustomBarChart
+                data={data.analisis.antiguedad}
+                xKey="rango"
+                barKey="cantidad"
+                title="Distribución por Antigüedad"
+              />
+            </Box>
+          )}
+
+          {/* Tabla de detalle por tipo de contratación */}
+          <Box mt={4}>
+            <Typography variant="h6" gutterBottom>Detalle por Contratación</Typography>
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Tipo</TableCell>
+                    <TableCell>Cantidad</TableCell>
+                    <TableCell>%</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {data.analisis.contratacion.map(c => (
+                    <TableRow key={c.tipo}>
+                      <TableCell>{c.tipo}</TableCell>
+                      <TableCell>{c.cantidad}</TableCell>
+                      <TableCell>{c.porcentaje}%</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
         </>
       )}
-    </div>
+    </Box>
   );
-};
+}
 
 export default DashboardPage;

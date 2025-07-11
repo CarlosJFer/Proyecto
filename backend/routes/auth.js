@@ -4,6 +4,27 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User'); // Usar minúscula para coincidir con el nombre de archivo real
 const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware'); // Cambiado de 'protect, admin' a 'authenticateToken, requireAdmin'
 
+// @desc    Cambiar contraseña de cualquier usuario (solo admin)
+// @route   PUT /api/auth/users/:id/change-password
+// @access  Private/Admin
+router.put('/users/:id/change-password', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ message: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Contraseña actualizada exitosamente' });
+  } catch (error) {
+    console.error('Error cambiando contraseña de usuario:', error);
+    res.status(500).json({ message: 'Error del servidor' });
+  }
+});
 // @desc    Autenticar usuario y obtener token (Login)
 // @route   POST /api/auth/login
 // @access  Public
@@ -74,6 +95,7 @@ router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
     // Crear el usuario
     const user = new User({
       username,
+      email: req.body.email,
       password,
       role: userRole,
     });
@@ -140,7 +162,7 @@ router.put('/users/:id', authenticateToken, requireAdmin, async (req, res) => {
     res.json({
       _id: user._id,
       username: user.username,
-      role: userser.role,
+      role: user.role,
       message: 'Usuario actualizado exitosamente',
     });
 
@@ -162,7 +184,8 @@ router.delete('/Users/:id', authenticateToken, requireAdmin, async (req, res) =>
     }
 
     // Evitar que el admin se elimine a sí mismo
-    if (user._id.toString() === req.user._id.toString()) {
+    const currentUserId = req.user.userId || req.user._id;
+    if (user._id.toString() === String(currentUserId)) {
       return res.status(400).json({ message: 'No puedes eliminar tu propia cuenta' });
     }
 
