@@ -1,8 +1,15 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
-const User = require('../models/User'); // Usar minúscula para coincidir con el nombre de archivo real
-const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware'); // Cambiado de 'protect, admin' a 'authenticateToken, requireAdmin'
+const User = require('../models/User'); // Importar User para createAdminUser
+
+// Importa los controladores y el middleware
+const { loginUser, createUser, getUsers } = require('../controllers/authController');
+const { authenticateToken, requireAdmin } = require('../middleware/authMiddleware');
+
+// Rutas principales usando el controlador
+router.post('/login', loginUser);
+router.post('/users', authenticateToken, requireAdmin, createUser);
+router.get('/users', authenticateToken, requireAdmin, getUsers);
 
 // @desc    Cambiar contraseña de cualquier usuario (solo admin)
 // @route   PUT /api/auth/users/:id/change-password
@@ -25,95 +32,6 @@ router.put('/users/:id/change-password', authenticateToken, requireAdmin, async 
     res.status(500).json({ message: 'Error del servidor' });
   }
 });
-// @desc    Autenticar usuario y obtener token (Login)
-// @route   POST /api/auth/login
-// @access  Public
-router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-
-  try {
-    // Validar que se proporcionen ambos campos
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Por favor proporciona usuario y contraseña' });
-    }
-
-    const user = await User.findOne({ username });
-
-    if (user && (await user.comparePassword(password))) { // Cambiado de 'matchPassword' a 'comparePassword'
-      const token = jwt.sign(
-        { userId: user._id, role: user.role }, // Cambiado de 'id' a 'userId' para consistencia
-        process.env.JWT_SECRET,
-        { expiresIn: '8h' }
-      );
-
-      res.json({
-        _id: user._id,
-        username: user.username,
-        role: user.role,
-        token: token,
-        message: 'Login exitoso'
-      });
-    } else {
-      res.status(401).json({ message: 'Usuario o contraseña inválidos' });
-    }
-  } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({ message: 'Error del servidor' });
-  }
-});
-
-// @desc    Crear un nuevo usuario (solo para admins)
-// @route   POST /api/auth/users
-// @access  Private/Admin
-router.post('/users', authenticateToken, requireAdmin, async (req, res) => {
-  const { username, password, role } = req.body;
-
-  try {
-    // Validar campos requeridos
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Usuario y contraseña son requeridos' });
-    }
-
-    // Validar longitud de contraseña
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres' });
-    }
-
-    // Verificar si el usuario ya existe
-    const existingUser = await User.findOne({ username });
-    if (existingUser) {
-      return res.status(400).json({ message: 'El usuario ya existe' });
-    }
-
-    // Validar rol
-    const validRoles = ['user', 'admin'];
-    const userRole = role || 'user';
-    if (!validRoles.includes(userRole)) {
-      return res.status(400).json({ message: 'Rol inválido' });
-    }
-
-    // Crear el usuario
-    const user = new User({
-      username,
-      email: req.body.email,
-      password,
-      role: userRole,
-    });
-
-    await user.save();
-
-    res.status(201).json({
-      _id: user._id,
-      username: user.username,
-      role: user.role,
-      message: 'Usuario creado exitosamente',
-    });
-
-  } catch (error) {
-    console.error('Error creando usuario:', error);
-    res.status(500).json({ message: 'Error del servidor' });
-  }
-});
 
 // @desc    Obtener información del usuario actual
 // @route   GET /api/auth/me
@@ -124,19 +42,6 @@ router.get('/me', authenticateToken, async (req, res) => {
     res.json(user);
   } catch (error) {
     console.error('Error obteniendo usuario:', error);
-    res.status(500).json({ message: 'Error del servidor' });
-  }
-});
-
-// @desc    Obtener lista de todos los usuarios (solo admins)
-// @route   GET /api/auth/users
-// @access  Private/Admin
-router.get('/users', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const users = await User.find({}).select('-password').sort({ createdAt: -1 });
-    res.json(users);
-  } catch (error) {
-    console.error('Error obteniendo usuarios:', error);
     res.status(500).json({ message: 'Error del servidor' });
   }
 });

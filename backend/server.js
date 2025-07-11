@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
+const connectDB = require('./config/db'); // Importar la función centralizada
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
@@ -20,13 +21,8 @@ app.use(express.urlencoded({ extended: true }));
 // Servir archivos estáticos (para archivos subidos si es necesario)
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Conexión a MongoDB Atlas
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log('✅ MongoDB conectado exitosamente.'))
-.catch(err => console.error('❌ Error al conectar a MongoDB:', err));
+// Conexión a MongoDB Atlas usando la función centralizada
+connectDB();
 
 // Rutas de la API
 app.use('/api/auth', authRoutes);
