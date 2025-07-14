@@ -10,6 +10,8 @@ const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/uploadRoutes');
 const analyticsRoutes = require('./routes/analytics');
 const dependencyRoutes = require('./routes/dependency');
+const notificationsRoutes = require('./routes/notifications');
+const auditRoutes = require('./routes/audit');
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/dependencies', dependencyRoutes);
+app.use('/api/notifications', notificationsRoutes);
+app.use('/api/audit', auditRoutes);
 
 // Ruta de bienvenida
 app.get('/', (req, res) => {
@@ -39,7 +43,10 @@ app.get('/', (req, res) => {
     endpoints: {
       auth: '/api/auth',
       upload: '/api/upload',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      dependencies: '/api/dependencies',
+      notifications: '/api/notifications',
+      audit: '/api/audit'
     }
   });
 });
@@ -61,7 +68,10 @@ app.use('*', (req, res) => {
     availableRoutes: {
       auth: '/api/auth',
       upload: '/api/upload',
-      analytics: '/api/analytics'
+      analytics: '/api/analytics',
+      dependencies: '/api/dependencies',
+      notifications: '/api/notifications',
+      audit: '/api/audit'
     }
   });
 });
