@@ -76,61 +76,83 @@ const procesarDatosExcel = (datosExcel) => {
 // Subir y procesar archivo Excel
 const uploadExcel = async (req, res) => {
   try {
-    if (!req.file) {
+    if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'No se subió ningún archivo' });
     }
-    const workbook = XLSX.readFile(req.file.path);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const datosExcel = XLSX.utils.sheet_to_json(worksheet);
-    if (datosExcel.length === 0) {
-      return res.status(400).json({ message: 'El archivo Excel está vacío' });
-    }
-    const porSecretaria = {};
-    datosExcel.forEach(registro => {
-      const secretaria = registro.SECRETARIA || 'No especificada';
-      if (!porSecretaria[secretaria]) {
-        porSecretaria[secretaria] = [];
+    let resultadosGlobales = [];
+    let totalSecretariasGlobal = 0;
+    let totalRegistrosGlobal = 0;
+    for (const file of req.files) {
+      const workbook = XLSX.readFile(file.path);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const datosExcel = XLSX.utils.sheet_to_json(worksheet);
+      if (datosExcel.length === 0) {
+        resultadosGlobales.push({ archivo: file.originalname, error: 'El archivo Excel está vacío' });
+        fs.unlinkSync(file.path);
+        continue;
       }
-      porSecretaria[secretaria].push(registro);
-    });
-    const resultados = [];
-    for (const [secretariaNombre, datosSecretaria] of Object.entries(porSecretaria)) {
-      const datosAnalisis = procesarDatosExcel(datosSecretaria);
-      const secretariaId = secretariaNombre.toLowerCase().replace(/\s+/g, '-');
-      await AnalysisData.updateMany(
-        { secretariaId, activo: true },
-        { activo: false }
-      );
-      const nuevoAnalisis = new AnalysisData({
-        secretariaId,
-        secretariaNombre,
-        data: datosAnalisis,
-        archivoInfo: {
-          nombreArchivo: req.file.originalname,
-          fechaCarga: new Date(),
+      // Validación avanzada de columnas requeridas
+      const columnasRequeridas = ['SECRETARIA', 'TIPO_CONTRATACION', 'FUNCION', 'ESCALAFON', 'FECHA_NACIMIENTO', 'FECHA_INGRESO', 'GENERO', 'SUELDO_BASICO'];
+      const columnasArchivo = Object.keys(datosExcel[0] || {});
+      const faltantes = columnasRequeridas.filter(col => !columnasArchivo.includes(col));
+      if (faltantes.length > 0) {
+        resultadosGlobales.push({ archivo: file.originalname, error: `El archivo Excel no contiene las siguientes columnas requeridas: ${faltantes.join(', ')}` });
+        fs.unlinkSync(file.path);
+        continue;
+      }
+      const porSecretaria = {};
+      datosExcel.forEach(registro => {
+        const secretaria = registro.SECRETARIA || 'No especificada';
+        if (!porSecretaria[secretaria]) {
+          porSecretaria[secretaria] = [];
+        }
+        porSecretaria[secretaria].push(registro);
+      });
+      for (const [secretariaNombre, datosSecretaria] of Object.entries(porSecretaria)) {
+        const datosAnalisis = procesarDatosExcel(datosSecretaria);
+        const secretariaId = secretariaNombre.toLowerCase().replace(/\s+/g, '-');
+        await AnalysisData.updateMany(
+          { secretariaId, activo: true },
+          { activo: false }
+        );
+        const nuevoAnalisis = new AnalysisData({
+          secretariaId,
+          secretariaNombre,
+          data: datosAnalisis,
+          archivoInfo: {
+            nombreArchivo: file.originalname,
+            fechaCarga: new Date(),
+            totalRegistros: datosSecretaria.length,
+            usuarioId: req.user._id,
+          },
+        });
+        await nuevoAnalisis.save();
+        resultadosGlobales.push({
+          archivo: file.originalname,
+          secretaria: secretariaNombre,
           totalRegistros: datosSecretaria.length,
-          usuarioId: req.user._id,
-        },
-      });
-      await nuevoAnalisis.save();
-      resultados.push({
-        secretaria: secretariaNombre,
-        totalRegistros: datosSecretaria.length,
-        procesado: true,
-      });
+          procesado: true,
+        });
+        totalSecretariasGlobal++;
+        totalRegistrosGlobal += datosSecretaria.length;
+      }
+      fs.unlinkSync(file.path);
     }
-    fs.unlinkSync(req.file.path);
     res.json({
-      message: 'Archivo procesado exitosamente',
-      resultados,
-      totalSecretarias: Object.keys(porSecretaria).length,
-      totalRegistros: datosExcel.length,
+      message: 'Archivos procesados',
+      resultados: resultadosGlobales,
+      totalSecretarias: totalSecretariasGlobal,
+      totalRegistros: totalRegistrosGlobal,
     });
   } catch (error) {
     console.error('Error procesando archivo:', error);
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+    if (req.files) {
+      req.files.forEach(file => {
+        if (file && fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
     }
     res.status(500).json({ message: 'Error procesando el archivo' });
   }

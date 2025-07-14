@@ -40,6 +40,6 @@ const upload = multer({
 });
 
 // Subir y procesar archivo Excel
-router.post('/', authenticateToken, requireAdmin, upload.single('archivo'), uploadExcel);
+router.post('/', authenticateToken, requireAdmin, upload.array('archivo'), uploadExcel);
 
 module.exports = router;

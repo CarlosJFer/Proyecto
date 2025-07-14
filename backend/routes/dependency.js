@@ -34,6 +34,9 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
     await nueva.save();
     res.status(201).json(nueva);
   } catch (error) {
+    if (error.code === 11000 && error.keyPattern && error.keyPattern.codigo) {
+      return res.status(409).json({ message: 'Ya existe una dependencia con ese código.' });
+    }
     res.status(500).json({ message: 'Error al crear dependencia', error: error.message });
   }
 });

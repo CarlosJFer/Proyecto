@@ -222,11 +222,33 @@ const downloadSecretariaPDF = async (req, res) => {
   }
 };
 
+// Obtener historial de cargas de una secretaría
+const getHistorialSecretaria = async (req, res) => {
+  try {
+    const secretariaId = req.params.id;
+    const historial = await AnalysisData.find({ secretariaId })
+      .sort({ analysisDate: -1 })
+      .populate('archivoInfo.usuarioId', 'username email');
+    const resultado = historial.map(item => ({
+      version: item.version,
+      fecha: item.analysisDate,
+      archivo: item.archivoInfo?.nombreArchivo,
+      usuario: item.archivoInfo?.usuarioId?.username || 'Desconocido',
+      totalRegistros: item.archivoInfo?.totalRegistros,
+    }));
+    res.json(resultado);
+  } catch (error) {
+    console.error('Error obteniendo historial:', error);
+    res.status(500).json({ message: 'Error del servidor' });
+  }
+};
+
 module.exports = {
   getSecretarias,
   getSecretariaById,
   getResumen,
   compararSecretarias,
   getEstadisticasPorCampo,
-  downloadSecretariaPDF
+  downloadSecretariaPDF,
+  getHistorialSecretaria
 }; 

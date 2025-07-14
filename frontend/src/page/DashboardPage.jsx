@@ -1,138 +1,269 @@
-// ARCHIVO: src/pages/DashboardPage.js (Modificado)
-
-
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { Box, Typography, Card, CardContent, CircularProgress, Alert, Grid, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import apiClient from '../services/api';
-import CustomBarChart from '../components/BarChart.jsx';
-import CustomPieChart from '../components/PieChart.jsx';
-import { Box, Typography, Card, CardContent, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper } from '@mui/material';
+import { saveAs } from 'file-saver';
+
+const StatCard = ({ title, value, color = 'primary.main' }) => (
+    <Card sx={{ height: '100%' }}>
+        <CardContent>
+            <Typography color="text.secondary" gutterBottom>
+                {title}
+            </Typography>
+            <Typography variant="h4" component="div" sx={{ color }}>
+                {value}
+            </Typography>
+        </CardContent>
+    </Card>
+);
+
+const CustomPieChart = ({ data, dataKey, nameKey, title }) => {
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28CFF'];
+    return (
+        <Card sx={{ height: '100%' }}>
+            <CardContent>
+                <Typography variant="h6" gutterBottom align="center">{title}</Typography>
+                <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                            <Pie data={data} dataKey={dataKey} nameKey={nameKey} cx="50%" cy="50%" outerRadius={100} label>
+                                {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </Box>
+            </CardContent>
+        </Card>
+    );
+};
+
+const CustomBarChart = ({ data, xKey, barKey, title }) => {
+    return (
+        <Card>
+            <CardContent>
+                <Typography variant="h6" gutterBottom align="center">{title}</Typography>
+                <Box sx={{ height: 300 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey={xKey} />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            <Bar dataKey={barKey} fill="#8884d8" />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </Box>
+            </CardContent>
+        </Card>
+    );
+};
+
+const downloadPDF = async (secretariaId, secretariaNombre) => {
+    try {
+        const token = localStorage.getItem('userInfo') ? JSON.parse(localStorage.getItem('userInfo')).token : null;
+        const response = await fetch(
+            `http://localhost:5001/api/analytics/secretarias/${secretariaId}/download`,
+            {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            }
+        );
+        if (!response.ok) throw new Error('No se pudo descargar el PDF');
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${secretariaNombre}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    } catch (err) {
+        alert('Error al descargar el PDF');
+    }
+};
+
+function toCSV(data) {
+    const rows = [];
+    // Resumen
+    rows.push(['Campo', 'Valor']);
+    rows.push(['Secretaría', data.secretaria.nombre]);
+    rows.push(['Total de Agentes', data.resumen.totalAgentes]);
+    rows.push(['Masa Salarial', data.resumen.masaSalarial]);
+    rows.push(['Sueldo Promedio', data.resumen.sueldoPromedio]);
+    rows.push(['Versión de Datos', data.metadatos.version]);
+    rows.push([]);
+    // Análisis por tipo de contratación
+    rows.push(['Tipo de Contratación', 'Cantidad', 'Porcentaje']);
+    data.analisis.contratacion.forEach(item => {
+        rows.push([item.tipo, item.cantidad, item.porcentaje]);
+    });
+    rows.push([]);
+    // Análisis por género
+    rows.push(['Género', 'Cantidad', 'Porcentaje']);
+    data.analisis.genero.forEach(item => {
+        rows.push([item.genero, item.cantidad, item.porcentaje]);
+    });
+    rows.push([]);
+    // Análisis por antigüedad
+    rows.push(['Antigüedad', 'Cantidad', 'Porcentaje']);
+    data.analisis.antiguedad.forEach(item => {
+        rows.push([item.rango, item.cantidad, item.porcentaje]);
+    });
+    return rows.map(r => r.join(',')).join('\n');
+}
+
+const exportCSV = (data) => {
+    const csv = toCSV(data);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `${data.secretaria.nombre}_dashboard.csv`);
+};
 
 const DashboardPage = () => {
-  const { secretariaId } = useParams();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+    const { secretariaId } = useParams();
+    const [data, setData] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    const [historial, setHistorial] = useState([]);
 
-  useEffect(() => {
-    // Si el ID es "default", no cargamos nada.
-    if (secretariaId === 'default') {
-      setData(null);
-      setLoading(false);
-      return;
+    useEffect(() => {
+        if (secretariaId === 'default' || !secretariaId) {
+            setData(null);
+            setLoading(false);
+            setHistorial([]);
+            return;
+        }
+
+        const fetchData = async () => {
+            setLoading(true);
+            setError('');
+            try {
+                const response = await apiClient.get(`/analytics/secretarias/${secretariaId}`);
+                setData(response.data);
+            } catch (err) {
+                setError('Error al cargar los datos. Por favor, selecciona otra secretaría o contacta al administrador.');
+                console.error(err);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const fetchHistorial = async () => {
+            try {
+                const response = await apiClient.get(`/analytics/secretarias/${secretariaId}/historial`);
+                setHistorial(response.data);
+            } catch (err) {
+                setHistorial([]);
+            }
+        };
+
+        fetchData();
+        fetchHistorial();
+    }, [secretariaId]);
+
+    if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="80vh"><CircularProgress /></Box>;
+    if (error) return <Alert severity="error" sx={{ m: 4 }}>{error}</Alert>;
+    if (!data) {
+        return (
+            <Box textAlign="center" p={5}>
+                <Typography variant="h4" color="text.secondary">Bienvenido al Panel de Análisis</Typography>
+                <Typography variant="h6" color="text.secondary" mt={2}>Por favor, selecciona una secretaría desde el menú superior para comenzar.</Typography>
+            </Box>
+        );
     }
 
-    const fetchData = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        // 2. Usamos apiClient para llamar al endpoint real. El token se añade automáticamente.
-        const response = await apiClient.get(`/analytics/secretarias/${secretariaId}`);
-        setData(response.data); // 3. Guardamos los datos reales en el estado
-      } catch (err) {
-        setError('Error al cargar los datos de la secretaría.');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    return (
+        <Box sx={{ flexGrow: 1, p: 3, backgroundColor: '#f4f6f8' }}>
+            <Typography variant="h4" gutterBottom>
+                Dashboard: {data.secretaria.nombre}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" gutterBottom>
+                Última Actualización: {new Date(data.secretaria.ultimaActualizacion).toLocaleString('es-AR')}
+            </Typography>
 
-    fetchData();
-  }, [secretariaId]); // Se ejecuta cada vez que cambia el secretariaId en la URL
-
-  if (loading) return <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh"><CircularProgress /></Box>;
-  if (error) return <Alert severity="error">{error}</Alert>;
-  return (
-    <Box maxWidth={1200} mx="auto" p={3}>
-      {/* Si es la página por defecto, mostramos un mensaje de bienvenida */}
-      {!data && secretariaId === 'default' && (
-        <Typography variant="h4" align="center" color="text.secondary">Bienvenido, por favor selecciona una secretaría para ver el análisis.</Typography>
-      )}
-
-      {/* Si hay datos, mostramos el dashboard */}
-      {data && (
-        <>
-          <Typography variant="h4" gutterBottom> Análisis para: {data.secretaria.nombre} </Typography>
-          <Card className="mb-6 mt-4 bg-gray-50">
-            <CardContent>
-              <Typography variant="h6" gutterBottom>Resumen General</Typography>
-              <Box display="flex" gap={6} flexWrap="wrap">
-                <Box>
-                  <Typography><strong>Total de Agentes:</strong> {data.resumen.totalAgentes}</Typography>
-                  <Typography><strong>Masa Salarial:</strong> ${data.resumen.masaSalarial.toLocaleString('es-AR')}</Typography>
-                  <Typography><strong>Sueldo Promedio:</strong> ${data.resumen.sueldoPromedio.toLocaleString('es-AR')}</Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Última actualización: {new Date(data.secretaria.ultimaActualizacion).toLocaleDateString()}
-                  </Typography>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-
-          {/* Gráficos principales */}
-          <Box display="flex" gap={6} flexWrap="wrap" justifyContent="space-between">
-            {/* Gráfico de barras: Distribución por tipo de contratación */}
-            <Box flex={1} minWidth={350}>
-              <CustomBarChart
-                data={data.analisis.contratacion}
-                xKey="tipo"
-                barKey="cantidad"
-                title="Distribución por Contratación"
-              />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2, gap: 2 }}>
+                <Button
+                    variant="outlined"
+                    color="primary"
+                    onClick={() => downloadPDF(data.secretaria.id || secretariaId, data.secretaria.nombre)}
+                    disabled={!data}
+                >
+                    Descargar PDF
+                </Button>
+                <Button
+                    variant="outlined"
+                    color="secondary"
+                    onClick={() => exportCSV(data)}
+                    disabled={!data}
+                >
+                    Exportar CSV
+                </Button>
             </Box>
-            {/* Gráfico de torta: Distribución por género (si existe) */}
-            {data.analisis.genero && Array.isArray(data.analisis.genero) && data.analisis.genero.length > 0 && (
-              <Box flex={1} minWidth={350}>
-                <CustomPieChart
-                  data={data.analisis.genero}
-                  dataKey="cantidad"
-                  nameKey="genero"
-                  title="Distribución por Género"
-                />
-              </Box>
-            )}
-          </Box>
 
-          {/* Otros gráficos: Antigüedad, agrupaciones, etc. */}
-          {data.analisis.antiguedad && Array.isArray(data.analisis.antiguedad) && data.analisis.antiguedad.length > 0 && (
-            <Box mt={4}>
-              <CustomBarChart
-                data={data.analisis.antiguedad}
-                xKey="rango"
-                barKey="cantidad"
-                title="Distribución por Antigüedad"
-              />
+            <Grid container spacing={3} columns={12} mt={2}>
+                <Grid sx={{ gridColumn: { xs: 'span 12', md: 'span 3' } }}>
+                    <StatCard title="Total de Agentes" value={data.resumen.totalAgentes} />
+                </Grid>
+                <Grid sx={{ gridColumn: { xs: 'span 12', md: 'span 3' } }}>
+                    <StatCard title="Masa Salarial" value={`$${data.resumen.masaSalarial.toLocaleString('es-AR')}`} />
+                </Grid>
+                <Grid sx={{ gridColumn: { xs: 'span 12', md: 'span 3' } }}>
+                    <StatCard title="Sueldo Promedio" value={`$${Math.round(data.resumen.sueldoPromedio).toLocaleString('es-AR')}`} />
+                </Grid>
+                <Grid sx={{ gridColumn: { xs: 'span 12', md: 'span 3' } }}>
+                    <StatCard title="Versión de Datos" value={data.metadatos.version} color="text.secondary" />
+                </Grid>
+
+                <Grid sx={{ gridColumn: { xs: 'span 12', lg: 'span 8' } }}>
+                    <CustomBarChart data={data.analisis.contratacion} xKey="tipo" barKey="cantidad" title="Distribución por Tipo de Contratación" />
+                </Grid>
+                <Grid sx={{ gridColumn: { xs: 'span 12', lg: 'span 4' } }}>
+                    <CustomPieChart data={data.analisis.genero} dataKey="cantidad" nameKey="genero" title="Distribución por Género" />
+                </Grid>
+                <Grid sx={{ gridColumn: 'span 12' }}>
+                    <CustomBarChart data={data.analisis.antiguedad} xKey="rango" barKey="cantidad" title="Distribución por Antigüedad" />
+                </Grid>
+            </Grid>
+
+            {/* Historial de cargas */}
+            <Box mt={5}>
+                <Typography variant="h6" gutterBottom>Historial de Cargas</Typography>
+                {historial.length === 0 ? (
+                    <Typography color="text.secondary">No hay historial disponible.</Typography>
+                ) : (
+                    <TableContainer component={Paper}>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Versión</TableCell>
+                                    <TableCell>Archivo</TableCell>
+                                    <TableCell>Fecha</TableCell>
+                                    <TableCell>Usuario</TableCell>
+                                    <TableCell>Total Registros</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {historial.map((item, idx) => (
+                                    <TableRow key={idx}>
+                                        <TableCell>{item.version}</TableCell>
+                                        <TableCell>{item.archivo}</TableCell>
+                                        <TableCell>{new Date(item.fecha).toLocaleString('es-AR')}</TableCell>
+                                        <TableCell>{item.usuario}</TableCell>
+                                        <TableCell>{item.totalRegistros}</TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                )}
             </Box>
-          )}
-
-          {/* Tabla de detalle por tipo de contratación */}
-          <Box mt={4}>
-            <Typography variant="h6" gutterBottom>Detalle por Contratación</Typography>
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Tipo</TableCell>
-                    <TableCell>Cantidad</TableCell>
-                    <TableCell>%</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {data.analisis.contratacion.map(c => (
-                    <TableRow key={c.tipo}>
-                      <TableCell>{c.tipo}</TableCell>
-                      <TableCell>{c.cantidad}</TableCell>
-                      <TableCell>{c.porcentaje}%</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        </>
-      )}
-    </Box>
-  );
-}
+        </Box>
+    );
+};
 
 export default DashboardPage;

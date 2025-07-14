@@ -1,36 +1,38 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import apiClient from '../services/api';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
+import Brightness4Icon from '@mui/icons-material/Brightness4';
+import Brightness7Icon from '@mui/icons-material/Brightness7';
 
 const Navbar = () => {
   const [secretarias, setSecretarias] = useState([]);
-  const { user, logout } = useContext(AuthContext); // 3. Usar el estado y las funciones del contexto
+  const { user, logout } = useContext(AuthContext);
+  const { isDarkMode, toggleTheme } = useTheme();
 
   useEffect(() => {
-    // 4. Función para cargar las secretarías desde la API
     const fetchSecretarias = async () => {
       try {
         const { data } = await apiClient.get('/analytics/secretarias');
-        setSecretarias(data); // La API devuelve un array con { id, nombre, ... }
+        setSecretarias(data);
       } catch (error) {
         console.error('Error al cargar las secretarías:', error);
-        setSecretarias([]); // En caso de error, dejamos la lista vacía
+        setSecretarias([]);
       }
     };
-
-    // 5. Solo intentamos cargar las secretarías si hay un usuario logueado
     if (user) {
       fetchSecretarias();
     } else {
-      setSecretarias([]); // Si el usuario cierra sesión, limpiamos la lista
+      setSecretarias([]);
     }
-  }, [user]); // 6. El efecto se ejecuta cada vez que el estado del 'user' cambia
+  }, [user]);
 
   return (
     <AppBar position="static" color="primary" enableColorOnDark>
@@ -45,7 +47,10 @@ const Navbar = () => {
             </Button>
           ))}
         </Box>
-        <Box>
+        <Box className="flex flex-row items-center gap-2">
+          <IconButton color="inherit" onClick={toggleTheme} title={isDarkMode ? 'Tema claro' : 'Tema oscuro'}>
+            {isDarkMode ? <Brightness7Icon /> : <Brightness4Icon />}
+          </IconButton>
           {user ? (
             <>
               <Typography component="span" sx={{ mr: 2 }}>
