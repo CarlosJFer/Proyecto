@@ -33,7 +33,7 @@ const userSchema = new mongoose.Schema({
   organizationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization',
-    required: true,
+    // Ya no es obligatorio
     index: true
   },
   permissions: {

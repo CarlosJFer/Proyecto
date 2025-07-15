@@ -12,7 +12,7 @@ const ProtectedRoute = ({ adminOnly = false }) => {
 
   if (adminOnly && user.role !== 'admin') {
     // Si la ruta es solo para admin y el usuario no lo es, redirige
-    return <Navigate to="/dashboard/default" replace />;
+    return <Navigate to="/organigrama" replace />;
   }
 
   // Si todo está bien, muestra el contenido de la ruta

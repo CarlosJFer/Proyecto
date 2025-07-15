@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User'); // Importar User para createAdminUser
+const Organization = require('../models/Organization'); // Importar modelo de organización
 
 // Importa los controladores y el middleware
 const { loginUser, createUser, getUsers } = require('../controllers/authController');
@@ -139,6 +140,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
 // --- Script para crear el primer usuario admin ---
 const createAdminUser = async () => {
   try {
+    // Eliminar lógica de organización por defecto
     const adminExists = await User.findOne({ role: 'admin' });
     if (!adminExists) {
       const admin = new User({
@@ -146,6 +148,7 @@ const createAdminUser = async () => {
         email: 'admin@example.com', // Cambia esto por un email válido
         password: 'admin1234', // Cambia esto por una contraseña segura
         role: 'admin'
+        // organizationId eliminado
       });
       await admin.save();
       console.log('Usuario administrador creado.');

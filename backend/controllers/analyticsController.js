@@ -24,7 +24,7 @@ const getSecretarias = async (req, res) => {
 const getSecretariaById = async (req, res) => {
   try {
     const secretariaId = req.params.id;
-    const analisis = await AnalysisData.getLatestBySecretaria(secretariaId);
+    const analisis = await AnalysisData.findOne({ secretariaId }).sort({ createdAt: -1 });
     if (!analisis) {
       return res.status(404).json({ message: 'No se encontraron datos para esta secretaría' });
     }
@@ -94,8 +94,8 @@ const compararSecretarias = async (req, res) => {
   try {
     const { id1, id2 } = req.params;
     const [sec1, sec2] = await Promise.all([
-      AnalysisData.getLatestBySecretaria(id1),
-      AnalysisData.getLatestBySecretaria(id2)
+      AnalysisData.findOne({ secretariaId: id1 }).sort({ createdAt: -1 }),
+      AnalysisData.findOne({ secretariaId: id2 }).sort({ createdAt: -1 })
     ]);
     if (!sec1 || !sec2) {
       return res.status(404).json({ message: 'No se encontraron datos para una o ambas secretarías' });
@@ -172,7 +172,7 @@ const getEstadisticasPorCampo = async (req, res) => {
 const downloadSecretariaPDF = async (req, res) => {
   try {
     const secretariaId = req.params.id;
-    const analisis = await AnalysisData.getLatestBySecretaria(secretariaId);
+    const analisis = await AnalysisData.findOne({ secretariaId }).sort({ createdAt: -1 });
     if (!analisis) {
       return res.status(404).json({ message: 'No se encontraron datos para esta secretaría' });
     }

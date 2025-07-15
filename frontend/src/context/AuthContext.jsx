@@ -26,8 +26,18 @@ export const AuthProvider = ({ children }) => {
       setUser(data);
       return data;
     } catch (error) {
-      // Si hay un error, lo lanzamos para que el formulario de login lo capture
-      throw error.response?.data?.message || 'Error al iniciar sesión';
+      let msg = 'Error al iniciar sesión';
+      if (error.response) {
+        if (error.response.status === 401 && error.response.data && error.response.data.message) {
+          msg = error.response.data.message;
+        } else if (error.response.data && error.response.data.message) {
+          msg = error.response.data.message;
+        }
+      } else if (error.message) {
+        msg = error.message;
+      }
+      // Evitar que el error se propague como excepción no controlada
+      return Promise.reject(msg);
     }
   };
 

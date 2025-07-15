@@ -9,7 +9,17 @@ const loginUser = async (req, res) => {
             return res.status(400).json({ message: 'Por favor proporciona usuario y contraseña' });
         }
         const user = await User.findOne({ username });
-        if (user && (await user.comparePassword(password))) {
+        if (!user) {
+            return res.status(401).json({ message: 'Usuario o contraseña inválidos' });
+        }
+        let passwordOk = false;
+        try {
+            passwordOk = await user.comparePassword(password);
+        } catch (err) {
+            // Si la cuenta está bloqueada u otro error de validación
+            return res.status(401).json({ message: err.message || 'Usuario o contraseña inválidos' });
+        }
+        if (passwordOk) {
             const token = jwt.sign(
                 { userId: user._id, role: user.role },
                 process.env.JWT_SECRET,

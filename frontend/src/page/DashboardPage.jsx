@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { Box, Typography, Card, CardContent, CircularProgress, Alert, Grid, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import apiClient from '../services/api';
 import { saveAs } from 'file-saver';
 
-const StatCard = ({ title, value, color = 'primary.main' }) => (
+const StatCard = React.memo(({ title, value, color = 'primary.main' }) => (
     <Card sx={{ height: '100%' }}>
         <CardContent>
             <Typography color="text.secondary" gutterBottom>
@@ -16,10 +16,11 @@ const StatCard = ({ title, value, color = 'primary.main' }) => (
             </Typography>
         </CardContent>
     </Card>
-);
+));
 
-const CustomPieChart = ({ data, dataKey, nameKey, title }) => {
+const CustomPieChart = React.memo(({ data, dataKey, nameKey, title }) => {
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#A28CFF'];
+    const chartData = useMemo(() => data, [data]);
     return (
         <Card sx={{ height: '100%' }}>
             <CardContent>
@@ -27,8 +28,8 @@ const CustomPieChart = ({ data, dataKey, nameKey, title }) => {
                 <Box sx={{ height: 300 }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
-                            <Pie data={data} dataKey={dataKey} nameKey={nameKey} cx="50%" cy="50%" outerRadius={100} label>
-                                {data.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                            <Pie data={chartData} dataKey={dataKey} nameKey={nameKey} cx="50%" cy="50%" outerRadius={100} label>
+                                {chartData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                             </Pie>
                             <Tooltip />
                             <Legend />
@@ -38,16 +39,17 @@ const CustomPieChart = ({ data, dataKey, nameKey, title }) => {
             </CardContent>
         </Card>
     );
-};
+});
 
-const CustomBarChart = ({ data, xKey, barKey, title }) => {
+const CustomBarChart = React.memo(({ data, xKey, barKey, title }) => {
+    const chartData = useMemo(() => data, [data]);
     return (
         <Card>
             <CardContent>
                 <Typography variant="h6" gutterBottom align="center">{title}</Typography>
                 <Box sx={{ height: 300 }}>
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                        <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey={xKey} />
                             <YAxis />
@@ -60,7 +62,7 @@ const CustomBarChart = ({ data, xKey, barKey, title }) => {
             </CardContent>
         </Card>
     );
-};
+});
 
 const downloadPDF = async (secretariaId, secretariaNombre) => {
     try {

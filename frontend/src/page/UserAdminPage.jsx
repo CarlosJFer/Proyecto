@@ -1,7 +1,20 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import apiClient from '../services/api';
 import { TextField, Button, Select, MenuItem, Card, CardContent, Typography, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Box, Snackbar, Tooltip } from '@mui/material';
 
+
+const UserRow = React.memo(({ user, onEdit, onChangePassword, onDelete }) => (
+  <TableRow key={user._id}>
+    <TableCell>{user.username}</TableCell>
+    <TableCell>{user.email}</TableCell>
+    <TableCell>{user.role}</TableCell>
+    <TableCell>
+      <Tooltip title="Editar usuario"><span><Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => onEdit(user)}>Editar</Button></span></Tooltip>
+      <Tooltip title="Cambiar contraseña"><span><Button size="small" variant="outlined" color="info" sx={{ mr: 1 }} onClick={() => onChangePassword(user._id)}>Cambiar contraseña</Button></span></Tooltip>
+      <Tooltip title="Eliminar usuario"><span><Button size="small" variant="outlined" color="error" onClick={() => onDelete(user._id)}>Eliminar</Button></span></Tooltip>
+    </TableCell>
+  </TableRow>
+));
 
 const UserAdminPage = () => {
   // Snackbars
@@ -114,6 +127,8 @@ const UserAdminPage = () => {
     }
   };
 
+  const usersMemo = useMemo(() => users, [users]);
+
   return (
     <Box maxWidth={900} mx="auto" p={3}>
       <Typography variant="h4" gutterBottom>Gestión de Usuarios</Typography>
@@ -175,17 +190,14 @@ const UserAdminPage = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {users.map(user => (
-              <TableRow key={user._id}>
-                <TableCell>{user.username}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role}</TableCell>
-                <TableCell>
-                  <Tooltip title="Editar usuario"><span><Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => setEditingUser(user)}>Editar</Button></span></Tooltip>
-                  <Tooltip title="Cambiar contraseña"><span><Button size="small" variant="outlined" color="info" sx={{ mr: 1 }} onClick={() => setChangingPasswordUserId(user._id)}>Cambiar contraseña</Button></span></Tooltip>
-                  <Tooltip title="Eliminar usuario"><span><Button size="small" variant="outlined" color="error" onClick={() => handleDeleteUser(user._id)}>Eliminar</Button></span></Tooltip>
-                </TableCell>
-              </TableRow>
+            {usersMemo.map(user => (
+              <UserRow
+                key={user._id}
+                user={user}
+                onEdit={setEditingUser}
+                onChangePassword={setChangingPasswordUserId}
+                onDelete={handleDeleteUser}
+              />
             ))}
           </TableBody>
         </Table>

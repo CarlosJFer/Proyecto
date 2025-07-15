@@ -69,4 +69,27 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+// Obtener el árbol jerárquico de dependencias
+router.get('/tree', authenticateToken, async (req, res) => {
+  try {
+    const dependencias = await Dependency.find({ activo: true }).lean();
+    // Construir mapa de dependencias por id
+    const depMap = new Map(dependencias.map(dep => [String(dep._id), dep]));
+    // Construir árbol recursivo
+    function buildTree(parentId = null) {
+      return dependencias
+        .filter(dep => dep.idPadre === parentId)
+        .sort((a, b) => (a.orden || 999) - (b.orden || 999))
+        .map(dep => ({
+          ...dep,
+          children: buildTree(String(dep._id)),
+        }));
+    }
+    const tree = buildTree(null);
+    res.json(tree);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener árbol de dependencias', error: error.message });
+  }
+});
+
 module.exports = router;
