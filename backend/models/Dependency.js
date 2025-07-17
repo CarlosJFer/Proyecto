@@ -11,9 +11,12 @@ const DependencySchema = new mongoose.Schema({
     type: String,
     default: null, // null para secretarías principales
   },
+  orden: {
+    type: Number,
+    default: 999,
+  },
   nivel: {
     type: Number,
-    required: true,
     min: 1,
   },
   codigo: {

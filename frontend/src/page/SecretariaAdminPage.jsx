@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import apiClient from '../services/api';
 import { TextField, Button, Card, CardContent, Typography, CircularProgress, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Box, Snackbar, Tooltip, Select, MenuItem, FormControl, InputLabel, Checkbox, FormControlLabel } from '@mui/material';
+import { TreeItem } from '@mui/x-tree-view/TreeItem';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 
 const SecretariaAdminPage = () => {
@@ -20,6 +22,7 @@ const SecretariaAdminPage = () => {
   const [editingSec, setEditingSec] = useState(null);
   const [editError, setEditError] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [editSuccess, setEditSuccess] = useState(false);
 
   // Estado para dependencias existentes (para el select de padre)
   const [allDeps, setAllDeps] = useState([]);
@@ -29,7 +32,7 @@ const SecretariaAdminPage = () => {
     setError('');
     try {
       const { data } = await apiClient.get('/dependencies');
-      setSecretarias(data.filter(s => s.nivel === 1));
+      setSecretarias(data); // Mostrar todas las dependencias
     } catch (err) {
       setError('Error al cargar secretarías');
     } finally {
@@ -68,7 +71,7 @@ const SecretariaAdminPage = () => {
         ...newSec,
         idPadre: newSec.idPadre === '' ? null : newSec.idPadre,
         nivel: getNivel(newSec.idPadre),
-        orden: newSec.orden ? Number(newSec.orden) : undefined,
+        orden: newSec.orden !== '' ? Number(newSec.orden) : 999,
         activo: newSec.activo !== false,
       };
       await apiClient.post('/dependencies', payload);
@@ -89,6 +92,7 @@ const SecretariaAdminPage = () => {
     try {
       await apiClient.delete(`/dependencies/${id}`);
       fetchSecretarias();
+      fetchAllDeps(); // Actualizar la lista de dependencias para el select de Padre
       showSnackbar('Secretaría eliminada', 'success');
     } catch (err) {
       showSnackbar('Error al eliminar secretaría', 'error');
@@ -99,18 +103,20 @@ const SecretariaAdminPage = () => {
     e.preventDefault();
     setSavingEdit(true);
     setEditError('');
+    setEditSuccess(false);
     try {
       const payload = {
         ...editingSec,
         idPadre: editingSec.idPadre === '' ? null : editingSec.idPadre,
         nivel: getNivel(editingSec.idPadre),
-        orden: editingSec.orden ? Number(editingSec.orden) : undefined,
+        orden: editingSec.orden !== '' ? Number(editingSec.orden) : 999,
         activo: editingSec.activo !== false,
       };
       await apiClient.put(`/dependencies/${editingSec._id}`, payload);
       setEditingSec(null);
       fetchSecretarias();
       fetchAllDeps();
+      setEditSuccess(true);
       showSnackbar('Dependencia editada correctamente', 'success');
     } catch (err) {
       setEditError(err.response?.data?.message || 'Error al editar dependencia');
@@ -124,8 +130,8 @@ const SecretariaAdminPage = () => {
     <TableRow key={sec._id}>
       <TableCell>{sec.nombre}</TableCell>
       <TableCell>{sec.codigo}</TableCell>
-      <TableCell>{sec.descripcion}</TableCell>
-      <TableCell>{sec.activo ? 'Sí' : 'No'}</TableCell>
+      <TableCell>{sec.orden !== undefined ? sec.orden : '-'}</TableCell>
+      <TableCell>{sec.activo !== false ? 'Activo' : 'Desactivado'}</TableCell>
       <TableCell>
         <Tooltip title="Editar"><span><Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => onEdit(sec)}>Editar</Button></span></Tooltip>
         <Tooltip title="Eliminar"><span><Button size="small" variant="outlined" color="error" onClick={() => onDelete(sec._id)}>Eliminar</Button></span></Tooltip>
@@ -150,10 +156,10 @@ const SecretariaAdminPage = () => {
             <TextField required label="ID" value={newSec.codigo} onChange={e => setNewSec({ ...newSec, codigo: e.target.value })} size="small" />
             {/* <TextField label="Descripción" value={newSec.descripcion} onChange={e => setNewSec({ ...newSec, descripcion: e.target.value })} size="small" /> */}
             <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel>Padre</InputLabel>
+              <InputLabel>Nivel</InputLabel>
               <Select
                 value={newSec.idPadre || ''}
-                label="Padre"
+                label="Nivel"
                 onChange={e => setNewSec({ ...newSec, idPadre: e.target.value })}
               >
                 <MenuItem value="">(Raíz / Secretaría principal)</MenuItem>
@@ -163,7 +169,7 @@ const SecretariaAdminPage = () => {
               </Select>
             </FormControl>
             <TextField
-              label="Orden"
+              label="Orden de la dependencia"
               type="number"
               value={newSec.orden || ''}
               onChange={e => setNewSec({ ...newSec, orden: e.target.value })}
@@ -189,12 +195,11 @@ const SecretariaAdminPage = () => {
             <Box component="form" onSubmit={handleEditSec} display="flex" flexWrap="wrap" gap={2} alignItems="center">
               <TextField required label="Nombre" value={editingSec.nombre} onChange={e => setEditingSec({ ...editingSec, nombre: e.target.value })} size="small" />
               <TextField required label="Código" value={editingSec.codigo} onChange={e => setEditingSec({ ...editingSec, codigo: e.target.value })} size="small" />
-              <TextField label="Descripción" value={editingSec.descripcion} onChange={e => setEditingSec({ ...editingSec, descripcion: e.target.value })} size="small" />
               <FormControl size="small" sx={{ minWidth: 180 }}>
-                <InputLabel>Padre</InputLabel>
+                <InputLabel>Nivel</InputLabel>
                 <Select
                   value={editingSec.idPadre || ''}
-                  label="Padre"
+                  label="Nivel"
                   onChange={e => setEditingSec({ ...editingSec, idPadre: e.target.value })}
                 >
                   <MenuItem value="">(Raíz / Secretaría principal)</MenuItem>
@@ -204,7 +209,7 @@ const SecretariaAdminPage = () => {
                 </Select>
               </FormControl>
               <TextField
-                label="Orden"
+                label="Orden de la dependencia"
                 type="number"
                 value={editingSec.orden || ''}
                 onChange={e => setEditingSec({ ...editingSec, orden: e.target.value })}
@@ -231,6 +236,9 @@ const SecretariaAdminPage = () => {
           </CardContent>
         </Card>
       )}
+      {editSuccess && (
+        <Alert severity="success" sx={{ my: 2 }}>¡Edición guardada correctamente!</Alert>
+      )}
 
       {!loading && !error && (
         <TableContainer component={Paper} sx={{ mt: 3 }}>
@@ -239,19 +247,28 @@ const SecretariaAdminPage = () => {
               <TableRow>
                 <TableCell>Nombre</TableCell>
                 <TableCell>Código</TableCell>
-                <TableCell>Descripción</TableCell>
+                <TableCell>Nivel</TableCell>
+                <TableCell>Orden de la dependencia</TableCell>
                 <TableCell>Activo</TableCell>
                 <TableCell>Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {secretariasMemo.map(sec => (
-                <SecretariaRow
-                  key={sec._id}
-                  sec={sec}
-                  onEdit={setEditingSec}
-                  onDelete={handleDeleteSec}
-                />
+                <TableRow key={sec._id}>
+                  <TableCell>
+                    {sec.nivel > 1 && <ChevronRightIcon fontSize="small" sx={{ verticalAlign: 'middle', color: 'gray.500', mr: 0.5 }} />}
+                    {sec.nombre}
+                  </TableCell>
+                  <TableCell>{sec.codigo}</TableCell>
+                  <TableCell>{sec.nivel || '-'}</TableCell>
+                  <TableCell>{sec.orden !== undefined ? sec.orden : '-'}</TableCell>
+                  <TableCell>{sec.activo !== false ? 'Activo' : 'Desactivado'}</TableCell>
+                  <TableCell>
+                    <Tooltip title="Editar"><span><Button size="small" variant="outlined" sx={{ mr: 1 }} onClick={() => setEditingSec(sec)}>Editar</Button></span></Tooltip>
+                    <Tooltip title="Eliminar"><span><Button size="small" variant="outlined" color="error" onClick={() => handleDeleteSec(sec._id)}>Eliminar</Button></span></Tooltip>
+                  </TableCell>
+                </TableRow>
               ))}
             </TableBody>
           </Table>

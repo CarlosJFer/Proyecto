@@ -20,16 +20,18 @@ router.get('/', authenticateToken, async (req, res) => {
 // Crear una nueva dependencia (solo admin)
 router.post('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nombre, codigo, descripcion } = req.body;
+    const { nombre, codigo, descripcion, idPadre, orden, nivel, activo } = req.body;
     if (!nombre || !codigo) {
       return res.status(400).json({ message: 'Nombre y código son requeridos' });
     }
     const nueva = new Dependency({
       nombre,
       codigo,
-      nivel: 1, // Secretarías principales
       descripcion: descripcion || '',
-      idPadre: null,
+      idPadre: idPadre === '' ? null : idPadre,
+      orden: orden !== undefined ? orden : 999,
+      nivel: nivel !== undefined ? nivel : 1,
+      activo: activo !== undefined ? activo : true,
     });
     await nueva.save();
     res.status(201).json(nueva);
@@ -44,13 +46,16 @@ router.post('/', authenticateToken, requireAdmin, async (req, res) => {
 // Editar una dependencia (solo admin)
 router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { nombre, codigo, descripcion, activo } = req.body;
+    const { nombre, codigo, descripcion, activo, idPadre, orden, nivel } = req.body;
     const dep = await Dependency.findById(req.params.id);
     if (!dep) return res.status(404).json({ message: 'Dependencia no encontrada' });
     if (nombre) dep.nombre = nombre;
     if (codigo) dep.codigo = codigo;
     if (descripcion !== undefined) dep.descripcion = descripcion;
     if (activo !== undefined) dep.activo = activo;
+    if (idPadre !== undefined) dep.idPadre = idPadre === '' ? null : idPadre;
+    if (orden !== undefined) dep.orden = orden;
+    if (nivel !== undefined) dep.nivel = nivel;
     await dep.save();
     res.json(dep);
   } catch (error) {
@@ -89,6 +94,16 @@ router.get('/tree', authenticateToken, async (req, res) => {
     res.json(tree);
   } catch (error) {
     res.status(500).json({ message: 'Error al obtener árbol de dependencias', error: error.message });
+  }
+});
+
+// Obtener la lista plana de dependencias activas
+router.get('/flat', authenticateToken, async (req, res) => {
+  try {
+    const dependencias = await Dependency.find({ activo: true }).lean();
+    res.json(dependencias);
+  } catch (error) {
+    res.status(500).json({ message: 'Error al obtener dependencias planas', error: error.message });
   }
 });
 
